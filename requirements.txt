@@ -1,0 +1,5 @@
+notion-client
+python-dotenv
+colorama
+requests
+duckduckgo-search

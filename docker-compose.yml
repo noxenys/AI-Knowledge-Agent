@@ -1,0 +1,17 @@
+services:
+  notion-agent:
+    build: .
+    container_name: notion_agent_brain
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      # Optional: Mount logs or data if needed, but script prints to stdout
+      - .:/app
+    # Ensure time synchronization
+    # /etc/localtime:/etc/localtime:ro is often used but TZ env var works for python usually.
+    # For full system time sync in container:
+    # volumes:
+    #   - /etc/localtime:/etc/localtime:ro
