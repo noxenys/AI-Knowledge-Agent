@@ -1,6 +1,6 @@
 # 部署指南
 
-本项目支持 Docker 和 Docker Compose 一键部署。
+本项目已配置 GitHub Actions 自动构建 Docker 镜像，支持直接拉取运行，无需本地构建。
 
 ## 1. 配置环境变量
 
@@ -18,35 +18,45 @@ cp .env.example .env
 
 ## 2. Docker Compose 部署 (推荐)
 
-启动服务（后台运行，重启策略为 always）：
+本项目默认使用 GitHub Container Registry (GHCR) 上的预构建镜像。
+
+### 启动服务
+
+直接运行以下命令，Docker 会自动拉取最新镜像并启动：
 
 ```bash
 docker-compose up -d
 ```
 
-查看日志：
+### 更新镜像
 
+如果代码仓库有更新，执行以下命令获取最新版本：
+
+```bash
+docker-compose pull
+docker-compose up -d
+```
+
+### 常用命令
+
+查看日志：
 ```bash
 docker-compose logs -f
 ```
 
 停止服务：
-
 ```bash
 docker-compose down
 ```
 
-## 3. 手动 Docker 构建
+## 3. 手动 Docker 构建 (仅开发调试)
 
-构建镜像：
+如果你想修改代码并在本地测试，可以取消 `docker-compose.yml` 中 `image: ...` 的注释，并启用 `build: .`。
+
+或者手动构建：
 
 ```bash
 docker build -t notion-agent .
-```
-
-运行容器：
-
-```bash
 docker run -d --name notion-agent --env-file .env notion-agent
 ```
 

@@ -3,3 +3,4 @@ python-dotenv
 colorama
 requests
 duckduckgo-search
+python-dateutil

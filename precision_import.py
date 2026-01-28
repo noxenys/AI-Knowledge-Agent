@@ -1,154 +1,173 @@
+import os
+import sys
 from agent_notion import NotionAgent
-import time
 
+# -----------------------------------------------------------------------------
+# Content Definitions
+# -----------------------------------------------------------------------------
 
-def build_items():
-    return [
-        {
-            "title": "Stripe Iframe Master",
-            "tag": "Skill",
-            "url": "https://docs.stripe.com/payments/payment-element/best-practices",
-            "content": (
-                "中文功能简介：专门处理 Stripe 支付元素在 iframe 下的复杂嵌套与跳转问题，指导表单布局与重定向策略，确保安全与合规。\n\n"
-                "Original English Prompt:\n"
-                "The Payment Element contains an iframe that securely sends payment information to Stripe over an HTTPS connection. "
-                "Avoid placing the Payment Element within another iframe because some payment methods require a redirect to another page for payment confirmation. "
-                "For more information on iframe considerations, see Collect payment details.\n"
-                "Source: https://docs.stripe.com/payments/payment-element/best-practices"
-            ),
-        },
-        {
-            "title": "Cloudflare Bypass Expert",
-            "tag": "Skill",
-            "url": "https://github.com/unixfox/pupflare",
-            "content": (
-                "中文功能简介：针对自动化脚本过 Cloudflare 防护的工程化实践，采用 Chromium 代理、挑战等待、UserDataDir、Headful/Headless 切换等策略。\n\n"
-                "Original English Prompt:\n"
-                "A webpage proxy that request through Chromium (puppeteer) - can be used to bypass Cloudflare anti bot / anti ddos on any application (like curl). "
-                "This script has been configured to wait for the cloudflare challenge to pass but, you can configure the \"match\" for anything else using the environment variable CHALLENGE_MATCH. "
-                "To show the browser window, set the environment variable PUPPETEER_HEADFUL=1. "
-                "To specify user data directory, set PUPPETEER_USERDATADIR=/path/to/dir.\n"
-                "Source: https://github.com/unixfox/pupflare"
-            ),
-        },
-        {
-            "title": "merajmehrabi/puppeteer-mcp-server",
-            "tag": "MCP",
-            "url": "https://github.com/merajmehrabi/puppeteer-mcp-server",
-            "content": (
-                "中文功能简介：Puppeteer MCP 服务器，提供浏览器自动化工具集，支持 npx/本地/Node 直接运行并接入 Claude。\n\n"
-                "Original English Prompt:\n"
-                "This MCP server provides browser automation capabilities via Puppeteer with tool definitions, browser connection, and server initialization. "
-                "Add the following to your Claude Desktop configuration file:\n"
-                "{ \"mcpServers\": { \"puppeteer\": { \"command\": \"npx\", \"args\": [\"-y\", \"puppeteer-mcp-server\"], \"env\": {} } } }\n"
-                "Source: https://github.com/merajmehrabi/puppeteer-mcp-server"
-            ),
-        },
-        {
-            "title": "sultannaufal/puppeteer-mcp-server",
-            "tag": "MCP",
-            "url": "https://github.com/sultannaufal/puppeteer-mcp-server",
-            "content": (
-                "中文功能简介：自托管 Puppeteer MCP，提供 HTTP/SSE 远程访问、API Key 认证与 Docker 部署，生产可用。\n\n"
-                "Original English Prompt:\n"
-                "Self-hosted Puppeteer MCP server with remote SSE access, API key authentication, and Docker deployment. "
-                "Add the server with HTTP transport:\n"
-                "claude mcp add puppeteer http://localhost:3000/http --scope user --transport http --header \"Authorization: Bearer your-api-key-here\"\n"
-                "Source: https://github.com/sultannaufal/puppeteer-mcp-server"
-            ),
-        },
-        {
-            "title": "ratiofu/mcp-puppeteer",
-            "tag": "MCP",
-            "url": "https://github.com/ratiofu/mcp-puppeteer",
-            "content": (
-                "中文功能简介：轻量 Puppeteer MCP 服务器，智能浏览器管理、自动 npx 下载与启动，简化接入。\n\n"
-                "Original English Prompt:\n"
-                "A Model Context Protocol (MCP) server that provides browser automation capabilities through Puppeteer with intelligent browser management. "
-                "The server automatically downloads and runs via npx when your MCP client needs it.\n"
-                "Source: https://github.com/ratiofu/mcp-puppeteer"
-            ),
-        },
-        {
-            "title": "jaenster/puppeteer-mcp-claude",
-            "tag": "MCP",
-            "url": "https://github.com/jaenster/puppeteer-mcp-claude",
-            "content": (
-                "中文功能简介：面向 Claude 的 Puppeteer MCP，开箱 10+ 浏览器工具，跨平台安装简便。\n\n"
-                "Original English Prompt:\n"
-                "A Model Context Protocol server with 11 new puppeteer tools for browser automation. "
-                "Add via npx: { \"command\": \"npx\", \"args\": [\"puppeteer-mcp-claude\", \"serve\"], \"env\": { \"NODE_ENV\": \"production\" } }\n"
-                "Source: https://github.com/jaenster/puppeteer-mcp-claude"
-            ),
-        },
-        {
-            "title": "twolven/mcp-server-puppeteer-py",
-            "tag": "MCP",
-            "url": "https://github.com/twolven/mcp-server-puppeteer-py",
-            "content": (
-                "中文功能简介：Python 版 Playwright MCP 服务器，提供截图、执行 JS 等能力，错误处理更稳健。\n\n"
-                "Original English Prompt:\n"
-                "MCP server providing browser automation capabilities using Playwright (Python's equivalent to Puppeteer). "
-                "This server enables LLMs to interact with web pages, take screenshots, and execute JavaScript in a real browser environment.\n"
-                "Source: https://github.com/twolven/mcp-server-puppeteer-py"
-            ),
-        },
-        {
-            "title": "ZFC-Digital/puppeteer-real-browser",
-            "tag": "Skill",
-            "url": "https://github.com/ZFC-Digital/puppeteer-real-browser",
-            "content": (
-                "中文功能简介：模拟“真实浏览器”行为，降低被 Cloudflare 等服务识别为机器人风险，支持 Turnstile 自动点击。\n\n"
-                "Original English Prompt:\n"
-                "This package prevents Puppeteer from being detected as a bot in services like Cloudflare and allows you to pass captchas without any problems. "
-                "It behaves like a real browser. Turnstile: Cloudflare Turnstile automatically clicks on Captchas if set to true.\n"
-                "Source: https://github.com/ZFC-Digital/puppeteer-real-browser"
-            ),
-        },
-        {
-            "title": "Stripe Agent Toolkit (MCP)",
-            "tag": "MCP",
-            "url": "https://cursor.directory/mcp/stripe-agent-toolkit",
-            "content": (
-                "中文功能简介：通过 MCP 接入 Stripe API，实现支付、客户管理与账务工作流。\n\n"
-                "Original English Prompt:\n"
-                "Integrates with Stripe's API to enable payment processing, customer management, and financial operations for e-commerce and billing workflows.\n"
-                "Source: https://cursor.directory/mcp/stripe-agent-toolkit"
-            ),
-        },
-        {
-            "title": "Stripe MCP Server",
-            "tag": "MCP",
-            "url": "https://cursor.directory/mcp/stripe",
-            "content": (
-                "中文功能简介：与 Stripe API 交互的官方 MCP 入口，用于支付相关操作。\n\n"
-                "Original English Prompt:\n"
-                "Interact with the Stripe API via MCP. Install and configure in Cursor Settings > Features > MCP.\n"
-                "Source: https://cursor.directory/mcp/stripe"
-            ),
-        },
-    ]
+CONTENT_AGENT_BROWSER = """
+# 中文功能深度解析
+本技能详细拆解 Vercel Labs 推出的 `agent-browser` 工具。核心理念是**简化工具链**，不使用 17 个独立工具（点击、输入、滚动等），而是通过一个统一的 CLI 和 **Snapshot + Refs** 系统。
+- **Snapshot (@e1)**: 获取页面的可交互元素树，自动分配引用 ID（如 `@e1`, `@e2`）。
+- **Unified Interaction**: 所有操作（点击、填充）都基于这些引用 ID，极大降低了 LLM 的上下文消耗和幻觉风险。
+- **Self-Correction**: 结合 "Ralph Wiggum Loop" 思想，简化决策空间，让 Agent 更专注于任务流而非底层 DOM 操作。
 
+---
+
+# Agent-Browser Specialist
+
+## Core Philosophy
+Vercel's `agent-browser` reduces complexity by using a single CLI tool instead of multiple granular tools. The key innovation is the **Snapshot System** which assigns stable reference IDs (refs) to interactive elements.
+
+## Key Commands
+- **Navigate**: `agent-browser open <url>`
+- **Analyze**: `agent-browser snapshot -i` (Returns interactive elements with refs like `@e1`, `@e2`)
+- **Interact**: 
+  - `agent-browser click @e1`
+  - `agent-browser fill @e2 "user@example.com"`
+  - `agent-browser get text @e1`
+
+## Workflow Example
+1. **Open Page**: Start the session.
+   ```bash
+   agent-browser open https://example.com
+   ```
+2. **Get Refs**: Request a snapshot.
+   ```bash
+   agent-browser snapshot -i
+   # Output:
+   # - button "Submit" [ref=e1]
+   # - input "Email" [ref=e2]
+   ```
+3. **Action**: Use the ref to interact.
+   ```bash
+   agent-browser fill @e2 "hello@vercel.com"
+   agent-browser click @e1
+   ```
+
+## Best Practices
+- **Prefer `-i` flag**: Use `snapshot -i` to get only interactive elements, saving token context.
+- **Verification**: Use `agent-browser get text @e1` to verify state changes after actions.
+- **Global Link**: Install globally via `pnpm link --global` for system-wide agent access.
+"""
+
+CONTENT_STRIPE_STEALTH = """
+# 中文功能深度解析
+本技能聚焦于 Stripe 支付环境的高级测试与安全攻防（Red Teaming）。
+- **Iframe 穿透**: 解析攻击者如何利用 Overlay 技术覆盖 Stripe 官方 Iframe，劫持输入数据。
+- **Card Testing**: 详解 Stripe 的反欺诈机制（Rate Limit, CAPTCHA, ML Models）以及测试环境下的正确模拟姿势。
+- **Stealth Strategy**: 在自动化测试中，如何避免被判定为恶意 Bot（合理使用 Test Mode Keys, 模拟真实用户行为）。
+
+---
+
+# Stripe Stealth Master
+
+## Iframe Security & Penetration
+Stripe uses `<iframe>` elements to isolate PCI-DSS sensitive data.
+- **The Attack Vector**: "Overlay Attacks". Attackers inject pixel-perfect fake forms *over* the legitimate Stripe Iframe.
+- **Mechanism**: The malicious script captures keystrokes before they reach the secure Iframe.
+- **Defense**: Implement Content Security Policy (CSP) and monitor for unexpected DOM mutations around payment forms.
+
+## Testing Card Numbers (Test Mode Only)
+Do NOT use real cards in test mode. Use Stripe's reserved test numbers:
+- **Visa**: `4242 4242 4242 4242`
+- **Mastercard**: `5555 5555 5555 4444`
+- **Amex**: `3782 822463 10005`
+- **Non-Card Payment**: Use `pm_card_visa` objects instead of raw numbers in API calls.
+
+## Anti-Detection & Rate Limiting
+Stripe employs sophisticated ML models to detect "Card Testing" attacks (fraudsters validating stolen cards).
+- **Triggers**: High velocity of declines, sequential card numbers, single IP bursts.
+- **Bypass for Testing**:
+  - Ensure you are strictly using **Test Mode API Keys** (`sk_test_...`).
+  - Do not mix Live and Test keys.
+  - Implement exponential backoff in your automation scripts if you hit rate limits (`429 Too Many Requests`).
+"""
+
+CONTENT_PYTHON_AUTOMATION = """
+# 中文功能深度解析
+本技能总结 Python `asyncio` 在生产环境下的最佳实践，特别是针对高并发网络 I/O 任务。
+- **Event Loop**: 理解事件循环机制，严禁在 Async 函数中调用 Blocking IO（如 `time.sleep` 或同步 `requests`）。
+- **Concurrency**: 使用 `asyncio.gather` 和 `asyncio.create_task` 实现真正的并发执行。
+- **Error Handling**: 异步任务中的异常必须被捕获或 await，否则会被“吞掉”或导致未预期的行为。
+
+---
+
+# Python Automation Pro
+
+## Core Rules for Production Asyncio
+1. **Never Block the Loop**: 
+   - ❌ `time.sleep(1)` -> Stops the entire world.
+   - ✅ `await asyncio.sleep(1)` -> Yields control to other tasks.
+   - ❌ `requests.get()` -> Blocking.
+   - ✅ `httpx.get()` or `aiohttp` -> Non-blocking.
+
+## Task Management
+- **Fire and Forget? No.**: Always keep a reference to your tasks to prevent garbage collection mid-execution.
+  ```python
+  # Bad
+  asyncio.create_task(my_coro())
+  
+  # Good
+  task = asyncio.create_task(my_coro())
+  background_tasks.add(task)
+  task.add_done_callback(background_tasks.discard)
+  ```
+
+## Concurrent Execution
+Use `gather` for batch processing:
+```python
+async def main():
+    urls = ["http://a.com", "http://b.com"]
+    # Run fetch concurrently
+    results = await asyncio.gather(*(fetch(url) for url in urls))
+```
+
+## Exception Handling
+If a task fails in `gather`, it can cancel others depending on `return_exceptions`.
+- `return_exceptions=True`: Returns the Exception object instead of raising it, allowing other tasks to finish.
+"""
+
+# -----------------------------------------------------------------------------
+# Main Execution
+# -----------------------------------------------------------------------------
 
 def main():
     agent = NotionAgent()
-    items = build_items()
-    print(f"准备入库：{len(items)} 条精准采集结果，Status=Active")
-
-    for idx, item in enumerate(items, 1):
-        print(f"[{idx}/{len(items)}] Saving: {item['title']}")
+    
+    tasks = [
+        {
+            "title": "Agent-Browser Specialist",
+            "content": CONTENT_AGENT_BROWSER,
+            "url": "https://github.com/vercel-labs/agent-browser",
+            "tag": "Skill"
+        },
+        {
+            "title": "Stripe Stealth Master",
+            "content": CONTENT_STRIPE_STEALTH,
+            "url": "https://docs.stripe.com/testing",
+            "tag": "Skill"
+        },
+        {
+            "title": "Python Automation Pro",
+            "content": CONTENT_PYTHON_AUTOMATION,
+            "url": "https://docs.python.org/3/library/asyncio.html",
+            "tag": "Skill"
+        }
+    ]
+    
+    print("🚀 Starting Precision Import...")
+    for task in tasks:
+        print(f"\nProcessing: {task['title']}")
         agent.save_to_notion(
-            title=item["title"],
-            content=item["content"],
-            tag=item["tag"],
-            url=item["url"],
-            status="Active",
+            title=task["title"],
+            content=task["content"],
+            tag=task["tag"],
+            url=task["url"],
+            status="Active"
         )
-        time.sleep(0.5)
-
-    print("入库完成")
-
+    print("\n✨ All tasks processed.")
 
 if __name__ == "__main__":
     main()
-

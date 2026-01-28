@@ -1,128 +1,102 @@
-# AI Skills & MCP Knowledge Agent (Notion 版)
+# AI-Knowledge-Agent
 
-> **"Not just a crawler, but a self-healing guardian for your knowledge base."**
+> **"帮你自动维护 Notion 知识库的 Python 智能助手"**
 
-这是一个基于 Notion 的自动化知识库管理 Agent。它不仅仅是一个简单的数据同步工具，更是一个具备 **“链接自愈能力”** 和 **“全自动灾备”** 的智能管家。它负责 7x24 小时维护你收集的 AI 编程技巧 (Skills) 和 MCP 工具 (Model Context Protocol)，确保你的知识库永远保持最新、有效。
+这是一个让你**“只管收藏，不管整理”**的自动化工具。你只需要把 GitHub 仓库或技术文章的链接丢进 Notion，剩下的脏活累活全交给它。
 
-## 🧠 核心设计哲学 (Design Philosophy)
+它主要解决三个痛点：
+1.  **懒得填内容**：你只填 URL，它自动爬取网页内容并转成 Markdown 填入 Notion。
+2.  **链接总失效**：收藏的库改名或删了？它会自动全网搜索新的有效地址并帮你修好（**死链自愈**）。
+3.  **怕数据丢失**：每天自动把 Notion 数据全量备份到本地，生成 JSON/Markdown，甚至生成一个**“一键复活脚本”**，随时能重建数据库。
 
-*   **Source of Truth (唯一真理源)**：Notion 云端数据库是数据的唯一权威来源。所有的增删改查应优先在 Notion 端进行。
-*   **Agent 角色 (智能管家)**：Agent 部署在服务器/Docker 中，负责后台巡检、内容同步、死链修复和数据备份。它是无感的，默默工作的。
-*   **Local 角色 (本地部署)**：本地代码仅负责部署配置和接收“冷备份”，不作为日常知识管理的入口。
+即使你半年不看，你的知识库也依然是鲜活的，而不是一堆 404 死链。
 
----
+## 🧠 为什么做这个？
 
-## ✨ 核心功能 (Features)
-
-### 1. 🔄 自动巡检与同步 (Auto Sync)
-Agent 会周期性（默认每 24 小时）巡检 Notion 数据库：
-*   **新条目识别**：当你在 Notion 添加一条只包含 `URL` 的记录时，Agent 会自动访问该链接，抓取网页内容（Markdown），并填入 Notion 的 `Content` 字段。
-*   **内容更新**：通过 MD5 校验监测源网页变化，确保 Notion 中的内容与源头保持同步。
-
-### 2. 🔗 链接自愈 (Self-Healing) 🔥
-这是本项目的核心特性。当检测到某个 Skill 的 `Source` 链接失效（404 或 DNS 错误）时：
-1.  **智能重试**：首先进行多次网络重试。
-2.  **全网搜寻**：如果确认为死链，Agent 会调用搜索引擎（DuckDuckGo），结合标题关键词（如 "Title + Github"）寻找新的有效地址。
-3.  **自动修复**：
-    *   ✅ **找回成功**：自动更新 Notion 中的 URL，保持状态为 `Active`，并发送通知。
-    *   ❌ **找回失败**：将状态标记为 `Broken` 或 `Review`，等待人工确认。
-
-### 3. 📦 智能备份与反向播种 (Backup & Reseed)
-Agent 每天会自动执行全量备份，确保数据绝对安全：
-*   **多格式备份**：在 `backups/` 目录下生成结构化的 `JSON` 数据和易读的 `Markdown` 汇总文件。
-*   **反向种子生成 (Reverse Seeding)**：每次备份都会自动生成一个 **可执行的 Python 种子脚本** (`data_seed_latest.py`)。
-    *   *魔法之处*：你只需运行这个脚本，即可将当前的 Notion 数据库状态“一键复活”到一个全新的数据库中。
-
-### 4. 🤖 自动发现 (Auto Discovery)
-(可选开启) Agent 具备从 cursor.directory 等源头自动发现高质量 Python/AI 编程规则的能力，并将其自动入库待审。
+*   **Notion 就是我的数据库**：我不喜欢本地存一堆文件，Notion 是唯一的数据源。
+*   **机器人打工**：我只负责丢链接，剩下的抓取、检查、备份，全是机器人后台自己跑。
+*   **本地只是个备份**：Agent 每天会自动把 Notion 数据打包成 JSON/Markdown 文件。如果你用 Docker 部署，这些文件会自动保存到你服务器的 `backups/` 目录下（已配置挂载），确保云端数据在本地也有一份物理拷贝。
 
 ---
 
-## 🛠️ 架构说明
+## ✨ 它能干什么？
 
-```mermaid
-graph TD
-    Web[🌐 Web Sources] -->|Fetch & Parse| Agent(🤖 Agent Brain)
-    Agent -->|Sync & Heal| Notion[(Notion Database)]
-    Notion -->|Read & Verify| Agent
-    
-    subgraph Docker Container
-    Agent
-    end
-    
-    Agent -->|Daily Backup| LocalBackup[📂 Local Backups]
-    LocalBackup -->|Generate| SeedScript[🌱 seed_latest.py]
-    
-    Agent -->|Notify| Telegram[📢 Telegram Bot]
-```
+### 1. 🔄 自动填内容
+你在 Notion 里新建一个页面，填上 URL (比如 GitHub 仓库地址)，然后... 就可以不管了。
+程序会每隔一段时间（默认 24 小时）扫一遍，发现没内容的，就自动把网页内容抓下来填进去。
+
+### 2. 🔗 链接挂了能自动修 (Self-Healing) 🔥
+这可能是最有用的功能。
+很多时候收藏的 GitHub 库改名了，或者作者删库了，链接就变 404。
+这个工具发现 404 后，**不会直接报错摆烂**，而是：
+1.  先重试几次。
+2.  如果不灵，它会去 DuckDuckGo **搜这个项目的名字**。
+3.  如果找到了新的有效地址（比如项目改名迁移了），它会**自动把 Notion 里的链接改过来**，并给你发个通知。
+4.  实在找不到，才会标记为 `Broken` 等你手动处理。
+
+### 3. 📦 每天自动备份 + 一键复活
+怕 Notion 挂了？或者账号出问题？
+它每天会自动把 Notion 里的所有数据拉下来，存成：
+*   JSON 文件（数据结构）
+*   Markdown 文件（方便人看）
+*   **`data_seed_latest.py` (最强功能)**：这是一个 Python 脚本。
+    *   **怎么用？** 假如你换了个 Notion 账号，或者新建了个数据库，直接运行这个脚本：`python data_seed_latest.py`
+    *   **结果**：它会把之前备份的所有数据，原封不动地“种”进新数据库里。
 
 ---
 
-## 🚀 快速开始 (Deployment)
+## �️ 怎么跑起来？
 
-### 1. 环境配置
-复制环境变量示例文件：
+### 1. 准备工作
+先复制一份配置文件：
 ```bash
 cp .env.example .env
 ```
-编辑 `.env` 文件，填入你的配置：
-*   `NOTION_TOKEN`: Notion Integration Token
-*   `NOTION_DATABASE_ID`: 你的 Notion 数据库 ID
-*   `TELEGRAM_BOT_TOKEN`: (可选) 用于接收巡检报告
-*   `TELEGRAM_CHAT_ID`: (可选) 接收消息的 Chat ID
+打开 `.env` 填几个参数：
+*   `NOTION_TOKEN`: Notion 的机器人 Token。
+*   `NOTION_DATABASE_ID`: 你的数据库 ID。
+*   (可选) Telegram 相关的，填了就能收到通知，不填也能跑。
 
-### 2. Docker 部署 (推荐)
-本项目已容器化，支持一键启动，配置了 `Asia/Shanghai` 时区和自动重启策略。
+### 2. 启动 (推荐用 Docker)
+省事点，直接用 Docker 跑，环境都配好了：
 
 ```bash
 docker-compose up -d
 ```
-启动后，Agent 将立即开始第一次巡检，随后进入 24 小时循环模式。
+搞定。它会在后台一直运行，每天检查一次。
 
-### 3. 本地运行 (调试用)
-如果你想在本地开发或手动触发一次：
+### 3. 本地手动跑
+如果你想自己调试，或者手动触发一次备份：
 
 ```bash
-# 安装依赖
+# 装依赖
 pip install -r requirements.txt
 
-# 启动 Agent (包含巡检、自愈、备份全流程)
+# 跑起来
 python agent_brain.py
 ```
 
 ---
 
-## 📂 目录结构说明
+## 📂 文件是干嘛的？
 
-*   `agent_brain.py`: **🧠 大脑核心**。包含主循环、巡检逻辑、自愈算法和 Telegram 通知模块。
-*   `agent_notion.py`: **🔧 底层工具**。封装了 Notion API 的调用，实现了智能 Upsert（去重插入）和长文本分片逻辑。
-*   `backup_data.py`: **💾 备份模块**。负责拉取 Notion 数据，生成 JSON/Markdown 备份以及“种子脚本”。
-*   `data_seed_latest.py`: **🌱 最新种子**。由备份模块自动生成的最新数据快照脚本，可直接运行以恢复数据。
-*   `check_schema.py`: **🛡️ 校验工具**。用于检查 Notion 数据库的属性（Schema）是否符合 Agent 的要求。
+*   `agent_brain.py`: **大脑**。主程序，负责循环检查、修链接、发通知。
+*   `agent_notion.py`: **工具人**。负责跟 Notion 官方接口打交道，存数据、取数据。
+*   `backup_data.py`: **备份员**。专门负责把数据拉回本地存起来，顺便生成那个“复活脚本”。
+*   `data_seed_latest.py`: **复活药**。这就是自动生成的那个脚本，可以直接运行恢复数据。
 
 ---
 
-## 📝 使用指南
+## 📝 常见问题
 
-### 如何添加新技能？
-1.  打开你的 Notion 数据库。
-2.  点击 **New**。
-3.  填入 **Name** (技能名称) 和 **Source** (URL)。
-4.  (可选) 设置 Tag 为 `Skill` 或 `MCP`。
-5.  **无需做其他操作**。Agent 会在下一次巡检中自动抓取内容并填入 `Content`，状态会自动变更为 `Active`。
+**Q: 怎么加新技能？**
+A: 打开你的 Notion 数据库，点 New，填名字和 URL，选个 Tag (Skill/MCP)，完事。
 
-### 如何查看备份？
-所有备份文件存储在项目根目录的 `backups/` 文件夹中，按时间戳命名。
-*   查看 `skills_YYYYMMDD_HHMM.md` 可获得最佳阅读体验。
+**Q: 备份在哪？**
+A: 项目目录下的 `backups/` 文件夹里。
 
-### 如何灾难恢复？
-如果 Notion 数据被意外清空，或者你想迁移到新的工作区：
-1.  确保 `.env` 配置了目标数据库的 ID。
-2.  运行根目录下的最新种子脚本：
-    ```bash
-    python data_seed_latest.py
-    ```
-3.  所有数据将自动重新写入（播种）到数据库中。
+**Q: 数据库被清空了怎么办？**
+A: 运行 `python data_seed_latest.py`，喝杯咖啡，数据就回来了。
 
 ---
 

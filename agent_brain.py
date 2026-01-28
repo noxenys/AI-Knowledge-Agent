@@ -254,54 +254,65 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
     print_success("存量更新完成")
     return stats
 
-def discover_new_python_rules(agent: NotionAgent) -> Dict[str, int]:
-    print_info("开始增量发现：Python 自动化规则")
+def discover_new_rules(agent: NotionAgent) -> Dict[str, int]:
+    print_info("开始增量发现：Stripe & Automation 规则")
     stats = {"created": 0, "updated": 0, "skipped": 0, "error": 0}
     
-    search_url = "https://cursor.directory/search?q=python+automation"
-    html = fetch_remote_text(search_url)
-    if not html:
-        print_info("增量发现：无法获取 cursor.directory 搜索结果")
-        return stats
-
-    pattern = re.compile(r'href=\"(/rules/[^\"]+)\"[^>]*>([^<]*Python[^<]*)<', re.IGNORECASE)
-    matches = pattern.findall(html)
-    if not matches:
-        print_info("增量发现：未匹配到包含 Python 的规则链接")
-        return stats
-
+    keywords = ["stripe", "automation"]
     base = "https://cursor.directory"
     seen_titles = set()
 
-    for path, label in matches:
-        title = label.strip()
-        if not title:
-            title = path.rsplit("/", 1)[-1].replace("-", " ").title()
-        if title in seen_titles:
-            continue
-        seen_titles.add(title)
-
-        rule_url = base + path
-        remote_text = fetch_remote_text(rule_url)
-        if not remote_text:
+    for kw in keywords:
+        search_url = f"https://cursor.directory/search?q={kw}"
+        print_info(f"正在搜索 cursor.directory: {kw}")
+        html = fetch_remote_text(search_url)
+        if not html:
             continue
 
-        content = (
-            f"中文功能简介：来自 cursor.directory 的 Python 自动化规则 [{title}]，"
-            f"用于指导编写和维护自动化脚本与工具。\n\n"
-            f"Original English Content (fetched from {rule_url}):\n\n"
-            f"{remote_text}"
-        )
+        # Regex to find rule links. 
+        # Adapting to potential structure: <a href="/rules/foo-bar"> ... <h3>Foo Bar</h3> ... </a>
+        # This is a best-effort regex based on common patterns.
+        pattern = re.compile(r'href=\"(/rules/[^\"]+)\"', re.IGNORECASE)
+        matches = pattern.findall(html)
+        
+        if not matches:
+            print_info(f"未找到关于 {kw} 的规则")
+            continue
 
-        print_info(f"增量发现：尝试入库新规则: {title}")
-        res = agent.save_to_notion(
-            title=title,
-            content=content,
-            tag="Skill",
-            url=rule_url,
-            status="Active",
-        )
-        stats[res] = stats.get(res, 0) + 1
+        for path in matches:
+            # Deduplicate by URL path
+            if path in seen_titles:
+                continue
+            seen_titles.add(path)
+
+            # Derive title from path
+            # /rules/stripe-api-best-practices -> Stripe Api Best Practices
+            title = path.replace("/rules/", "").replace("-", " ").title()
+            
+            rule_url = base + path
+            remote_text = fetch_remote_text(rule_url)
+            if not remote_text:
+                continue
+
+            content = (
+                f"中文功能简介：自动发现的 {kw} 规则 [{title}]，"
+                f"用于增强 Agent 在该领域的自动化能力。\n\n"
+                f"Original Content ({rule_url}):\n\n"
+                f"{remote_text}"
+            )
+
+            print_info(f"增量发现：尝试入库新规则: {title}")
+            res = agent.save_to_notion(
+                title=title,
+                content=content,
+                tag="Skill",
+                url=rule_url,
+                status="Active",
+            )
+            stats[res] = stats.get(res, 0) + 1
+            
+            # Be polite to the server
+            time.sleep(1)
 
     print_success("增量发现流程完成")
     return stats
@@ -315,7 +326,7 @@ def run_once() -> None:
     
     # Run tasks and aggregate stats
     s1 = sync_existing_sources(client, agent)
-    s2 = discover_new_python_rules(agent)
+    s2 = discover_new_rules(agent)
     
     total_created = s1["created"] + s2["created"]
     total_updated = s1["updated"] + s2["updated"]

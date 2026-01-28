@@ -1,24 +1,24 @@
-# Environment Variables
+# Environments
 .env
+.env.*
+!.env.example
+
+# Backups and Data
+backups/
+data_seed_latest.py
+notion_browser_data/
 
 # Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
 venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
+.pytest_cache/
 
-# Local Data & Backups
-backups/
-notion_browser_data/
-*.log
+# OS
+.DS_Store
+Thumbs.db
 
 # IDE
-.vscode/
 .idea/
-.DS_Store
+.vscode/
+.agent/
