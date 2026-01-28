@@ -140,17 +140,28 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
     stats = {"created": 0, "updated": 0, "skipped": 0, "error": 0}
 
     while True:
-        query_args = {
-            "database_id": NOTION_DATABASE_ID,
-            "page_size": 100,
+        # Use direct requests to avoid library version issues
+        url = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query"
+        headers = {
+            "Authorization": f"Bearer {NOTION_TOKEN}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
         }
+        
+        payload = {"page_size": 100}
         if start_cursor:
-            query_args["start_cursor"] = start_cursor
+            payload["start_cursor"] = start_cursor
 
-        # Fix: The correct method is databases.query(**kwargs) 
-        # But if the library version is different, it might behave differently.
-        # Ensure we are using the correct call structure.
-        resp = notion_client.databases.query(**query_args)
+        try:
+            r = requests.post(url, json=payload, headers=headers, timeout=30)
+            if r.status_code != 200:
+                logger.error(f"Notion API Error: {r.text}")
+                break
+            resp = r.json()
+        except Exception as e:
+            logger.error(f"Notion Request Failed: {e}")
+            break
+
         results = resp.get("results", [])
         if not results:
             break
