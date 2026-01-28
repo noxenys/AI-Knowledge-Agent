@@ -267,6 +267,41 @@ def backup_notion_data(client: Client, database_id: str, backup_dir: str = "back
     except Exception as e:
         print_error(f"Failed to save Seed Script: {e}")
 
+    # Auto Cleanup Old Backups
+    cleanup_old_backups(backup_dir, keep_count=30)
+
+def cleanup_old_backups(backup_dir: str, keep_count: int = 30) -> None:
+    """Keep only the latest N backup files for each type."""
+    try:
+        files = os.listdir(backup_dir)
+        # Group by extension
+        files_by_ext = {}
+        for f in files:
+            ext = os.path.splitext(f)[1]
+            if ext not in files_by_ext:
+                files_by_ext[ext] = []
+            files_by_ext[ext].append(os.path.join(backup_dir, f))
+            
+        for ext, file_list in files_by_ext.items():
+            # Sort by modification time (newest first)
+            file_list.sort(key=os.path.getmtime, reverse=True)
+            
+            # Identify files to delete
+            to_delete = file_list[keep_count:]
+            
+            if to_delete:
+                print_info(f"正在清理过期备份 ({ext}): {len(to_delete)} 个文件")
+                for f_path in to_delete:
+                    try:
+                        os.remove(f_path)
+                        print(f"  🗑️ Deleted: {os.path.basename(f_path)}")
+                    except Exception as e:
+                        print_error(f"  ❌ Failed to delete {os.path.basename(f_path)}: {e}")
+                        
+    except Exception as e:
+        print_error(f"Cleanup failed: {e}")
+
+
 if __name__ == "__main__":
     # Test run
     from dotenv import load_dotenv
