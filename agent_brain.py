@@ -147,6 +147,9 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
         if start_cursor:
             query_args["start_cursor"] = start_cursor
 
+        # Fix: The correct method is databases.query(**kwargs) 
+        # But if the library version is different, it might behave differently.
+        # Ensure we are using the correct call structure.
         resp = notion_client.databases.query(**query_args)
         results = resp.get("results", [])
         if not results:
