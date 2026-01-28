@@ -4,6 +4,7 @@ import hashlib
 import traceback
 import re
 import requests
+import logging
 from typing import Optional, Dict
 from dotenv import load_dotenv
 from notion_client import Client
@@ -13,9 +14,6 @@ from agent_notion import (
     NOTION_TOKEN,
     NOTION_DATABASE_ID,
     validate_env,
-    print_info,
-    print_error,
-    print_success,
     extract_plain_rich_text,
     NotionAgent,
 )
@@ -27,10 +25,36 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+# Configure Logging
+class TelegramHandler(logging.Handler):
+    """Custom Logging Handler that sends critical logs to Telegram."""
+    def emit(self, record):
+        if record.levelno >= logging.ERROR:
+            try:
+                msg = self.format(record)
+                send_telegram_message(f"🚨 <b>System Error</b>\n<pre>{msg}</pre>")
+            except Exception:
+                self.handleError(record)
+
+# Setup Logger
+logger = logging.getLogger("NotionAgent")
+logger.setLevel(logging.INFO)
+
+# Console Handler
+c_handler = logging.StreamHandler()
+c_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(c_handler)
+
+# Telegram Handler
+if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+    t_handler = TelegramHandler()
+    t_handler.setFormatter(logging.Formatter('%(message)s'))
+    logger.addHandler(t_handler)
+
 def send_telegram_message(message: str) -> None:
     """Send a message to Telegram."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print_info("Telegram configuration missing. Skipping notification.")
+        logger.warning("Telegram configuration missing. Skipping notification.")
         return
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -42,9 +66,9 @@ def send_telegram_message(message: str) -> None:
     try:
         resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code != 200:
-            print_error(f"Telegram send failed: {resp.text}")
+            logger.error(f"Telegram send failed: {resp.text}")
     except Exception as e:
-        print_error(f"Telegram connection error: {e}")
+        logger.error(f"Telegram connection error: {e}")
 
 def md5_of_text(text: str) -> str:
     return hashlib.md5(text.encode("utf-8")).hexdigest()
@@ -55,7 +79,7 @@ def search_for_alternative_url(title: str, original_url: str) -> Optional[str]:
     Uses title + 'Github' or 'Cursor Rules' as query.
     """
     query = f"{title} Github Cursor Rules"
-    print_info(f"🔎 尝试自动修复链接，搜索关键词: {query}")
+    logger.info(f"🔎 尝试自动修复链接，搜索关键词: {query}")
     
     try:
         results = DDGS().text(query, max_results=3)
@@ -72,16 +96,16 @@ def search_for_alternative_url(title: str, original_url: str) -> Optional[str]:
             # Smart Matching Logic
             # 1. Same domain match (likely rename/move)
             if original_domain and original_domain in href:
-                print_info(f"✨ 发现同域名新链接: {href}")
+                logger.info(f"✨ 发现同域名新链接: {href}")
                 return href
                 
             # 2. Trusted Source Match (GitHub/Official)
             if "github.com" in href:
-                print_info(f"✨ 发现可信源(GitHub): {href}")
+                logger.info(f"✨ 发现可信源(GitHub): {href}")
                 return href
                 
     except Exception as e:
-        print_error(f"Search failed: {e}")
+        logger.error(f"Search failed: {e}")
         
     return None
 
@@ -89,21 +113,21 @@ def fetch_remote_text(url: str, timeout: int = 15) -> Optional[str]:
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            print_info(f"获取远程内容: {url} (Attempt {attempt+1}/{max_retries})")
+            logger.info(f"获取远程内容: {url} (Attempt {attempt+1}/{max_retries})")
             resp = requests.get(url, timeout=timeout)
             if resp.status_code == 200:
                 text = resp.text
                 if not text:
-                    print_error(f"远程内容为空: {url}")
+                    logger.error(f"远程内容为空: {url}")
                     return None
                 return text
             elif resp.status_code == 404:
-                print_error(f"404 Not Found: {url}")
+                logger.warning(f"404 Not Found: {url}")
                 return None
             else:
-                print_error(f"请求失败 {resp.status_code}: {url}")
+                logger.error(f"请求失败 {resp.status_code}: {url}")
         except Exception as e:
-            print_error(f"请求异常 {url}: {e}")
+            logger.error(f"请求异常 {url}: {e}")
         
         if attempt < max_retries - 1:
             time.sleep(2)
@@ -111,7 +135,7 @@ def fetch_remote_text(url: str, timeout: int = 15) -> Optional[str]:
     return None
 
 def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str, int]:
-    print_info("开始存量更新：基于 Source 链接巡检")
+    logger.info("开始存量更新：基于 Source 链接巡检")
     start_cursor: Optional[str] = None
     stats = {"created": 0, "updated": 0, "skipped": 0, "error": 0}
 
@@ -169,7 +193,7 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
             # 1. Self-managed / AI Created (No Source)
             if not source_url:
                 if current_status != "Active":
-                    print_info(f"自建内容状态修复: {title} -> Active")
+                    logger.info(f"自建内容状态修复: {title} -> Active")
                     res = agent.save_to_notion(
                         title=title, content=local_text, tag=tag_name, url=None, status="Active"
                     )
@@ -185,12 +209,12 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
             # 3. Dead Link / Fetch Failure
             if remote_text is None:
                 # Try Self-Healing
-                print_info(f"⚠️  链接失效，尝试自愈: {title}")
+                logger.warning(f"⚠️  链接失效，尝试自愈: {title}")
                 new_url = search_for_alternative_url(title, source_url)
                 
                 if new_url:
                     # Healing Success
-                    print_info(f"🚑 自愈成功: {source_url} -> {new_url}")
+                    logger.info(f"🚑 自愈成功: {source_url} -> {new_url}")
                     remote_text_healed = fetch_remote_text(new_url)
                     
                     if remote_text_healed:
@@ -210,32 +234,32 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
                 
                 # Healing Failed
                 if current_status != "Broken":
-                    print_info(f"❌ 死链自愈失败: {source_url} -> 标记为 Broken")
+                    logger.error(f"❌ 死链自愈失败: {source_url} -> 标记为 Broken")
                     # Update status to Broken
                     res = agent.save_to_notion(
                         title=title, content=local_text, tag=tag_name, url=source_url, status="Broken"
                     )
                     stats[res] = stats.get(res, 0) + 1
                 else:
-                    print_info(f"❌ 死链保持 Broken: {title}")
+                    logger.info(f"❌ 死链保持 Broken: {title}")
                     stats["skipped"] += 1
                 continue
 
             # 4. Success - Update Content & Restore Status
             if current_status != "Active":
-                print_info(f"✅ 链接恢复: {title} -> 恢复 Active")
+                logger.info(f"✅ 链接恢复: {title} -> 恢复 Active")
                 # Will be updated in save_to_notion call below
 
             local_md5 = md5_of_text(local_text)
             remote_md5 = md5_of_text(remote_text)
 
             if local_md5 == remote_md5 and current_status == "Active":
-                print_info(f"⏭️  [MD5 Match] 跳过更新: {title}")
+                logger.info(f"⏭️  [MD5 Match] 跳过更新: {title}")
                 stats["skipped"] += 1
                 continue
 
             new_content = f"自动同步自 Source：{source_url}\n\n{remote_text}"
-            print_info(f"检测到上游变更或状态修复: {title}")
+            logger.info(f"检测到上游变更或状态修复: {title}")
 
             res = agent.save_to_notion(
                 title=title,
@@ -251,11 +275,11 @@ def sync_existing_sources(notion_client: Client, agent: NotionAgent) -> Dict[str
 
         start_cursor = resp.get("next_cursor")
 
-    print_success("存量更新完成")
+    logger.info("存量更新完成")
     return stats
 
 def discover_new_rules(agent: NotionAgent) -> Dict[str, int]:
-    print_info("开始增量发现：Stripe & Automation 规则")
+    logger.info("开始增量发现：Stripe & Automation 规则")
     stats = {"created": 0, "updated": 0, "skipped": 0, "error": 0}
     
     keywords = ["stripe", "automation"]
@@ -264,7 +288,7 @@ def discover_new_rules(agent: NotionAgent) -> Dict[str, int]:
 
     for kw in keywords:
         search_url = f"https://cursor.directory/search?q={kw}"
-        print_info(f"正在搜索 cursor.directory: {kw}")
+        logger.info(f"正在搜索 cursor.directory: {kw}")
         html = fetch_remote_text(search_url)
         if not html:
             continue
@@ -276,7 +300,7 @@ def discover_new_rules(agent: NotionAgent) -> Dict[str, int]:
         matches = pattern.findall(html)
         
         if not matches:
-            print_info(f"未找到关于 {kw} 的规则")
+            logger.info(f"未找到关于 {kw} 的规则")
             continue
 
         for path in matches:
@@ -301,7 +325,7 @@ def discover_new_rules(agent: NotionAgent) -> Dict[str, int]:
                 f"{remote_text}"
             )
 
-            print_info(f"增量发现：尝试入库新规则: {title}")
+            logger.info(f"增量发现：尝试入库新规则: {title}")
             res = agent.save_to_notion(
                 title=title,
                 content=content,
@@ -314,7 +338,7 @@ def discover_new_rules(agent: NotionAgent) -> Dict[str, int]:
             # Be polite to the server
             time.sleep(1)
 
-    print_success("增量发现流程完成")
+    logger.info("增量发现流程完成")
     return stats
 
 def run_once() -> None:
@@ -322,7 +346,7 @@ def run_once() -> None:
     agent = NotionAgent()
     client = Client(auth=NOTION_TOKEN)
 
-    print_info("开始本轮巡检：存量更新 + 增量发现")
+    logger.info("开始本轮巡检：存量更新 + 增量发现")
     
     # Run tasks and aggregate stats
     s1 = sync_existing_sources(client, agent)
@@ -335,14 +359,14 @@ def run_once() -> None:
     report_msg = (
         f"✅ 新增: {total_created} | 🔄 更新: {total_updated} | ⏭️ 跳过: {total_skipped}"
     )
-    print_success(report_msg)
+    logger.info(report_msg)
     
     # Run Backup (Once per cycle, effectively daily in current loop)
     try:
-        print_info("开始执行每日数据冷备份...")
+        logger.info("开始执行每日数据冷备份...")
         backup_notion_data(client, NOTION_DATABASE_ID)
     except Exception as e:
-        print_error(f"Backup failed: {e}")
+        logger.error(f"Backup failed: {e}")
         send_telegram_message(f"⚠️ <b>备份失败</b>\n{str(e)}")
     
     # Send Telegram Report
@@ -350,24 +374,24 @@ def run_once() -> None:
 
 def main() -> None:
     validate_env()
-    print_info("Agent Brain initialized (7x24h auto-inspection mode)")
+    logger.info("Agent Brain initialized (7x24h auto-inspection mode)")
     
     while True:
         start = time.time()
         try:
             run_once()
         except KeyboardInterrupt:
-            print_info("收到中断信号，退出巡检")
+            logger.info("收到中断信号，退出巡检")
             break
         except Exception as e:
             error_msg = f"脚本巡检报错: {str(e)}"
-            print_error(error_msg)
+            logger.error(error_msg)
             traceback.print_exc()
             send_telegram_message(f"🚨 <b>紧急预警</b>\n{error_msg}")
 
         elapsed = time.time() - start
         sleep_seconds = max(0, 24 * 60 * 60 - int(elapsed))
-        print_info(f"下次巡检将在 {sleep_seconds} 秒后执行")
+        logger.info(f"下次巡检将在 {sleep_seconds} 秒后执行")
         time.sleep(sleep_seconds)
 
 if __name__ == "__main__":
