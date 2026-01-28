@@ -33,16 +33,20 @@ def fetch_active_skills():
     while has_more:
         if next_cursor:
             payload["start_cursor"] = next_cursor
-            
-        resp = requests.post(url, headers=headers, json=payload)
-        if resp.status_code != 200:
-            print(f"Error fetching data: {resp.text}")
+        
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+            if resp.status_code != 200:
+                print(f"Error fetching data: {resp.text}")
+                break
+                
+            data = resp.json()
+            results.extend(data.get("results", []))
+            has_more = data.get("has_more", False)
+            next_cursor = data.get("next_cursor")
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Network error: {e}")
             break
-            
-        data = resp.json()
-        results.extend(data.get("results", []))
-        has_more = data.get("has_more", False)
-        next_cursor = data.get("next_cursor")
         
     return results
 

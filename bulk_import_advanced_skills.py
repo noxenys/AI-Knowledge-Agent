@@ -147,13 +147,16 @@ def main():
 
     for idx, item in enumerate(items, 1):
         print(f"[{idx}/{len(items)}] Saving: {item['title']}")
-        agent.save_to_notion(
-            title=item["title"],
-            content=item["content"],
-            tag=item["tag"],
-            url=item["url"],
-            status="Active",
-        )
+        try:
+            agent.save_to_notion(
+                title=item["title"],
+                content=item["content"],
+                tag=item["tag"],
+                url=item["url"],
+                status="Active",
+            )
+        except Exception as e:
+            print(f"❌ Failed to save {item['title']}: {e}")
 
 
 if __name__ == "__main__":

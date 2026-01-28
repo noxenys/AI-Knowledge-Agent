@@ -1,104 +1,96 @@
 # AI-Knowledge-Agent
 
-> **"帮你自动维护 Notion 知识库的 Python 智能助手"**
+全自动 Notion 知识库维护工具。监控链接健康状态，自动填充网页内容，定期全量备份。
 
-这是一个让你**“只管收藏，不管整理”**的自动化工具。你只需要把 GitHub 仓库或技术文章的链接丢进 Notion，剩下的脏活累活全交给它。
+## 主要功能
 
-它主要解决三个痛点：
-1.  **懒得填内容**：你只填 URL，它自动爬取网页内容并转成 Markdown 填入 Notion。
-2.  **链接总失效**：收藏的库改名或删了？它会自动全网搜索新的有效地址并帮你修好（**死链自愈**）。
-3.  **怕数据丢失**：每天自动把 Notion 数据全量备份到本地，生成 JSON/Markdown，甚至生成一个**“一键复活脚本”**，随时能重建数据库。
+### 1. 自动内容抓取
+监控 Notion 中仅包含 URL 的页面，自动爬取网页正文并转换为 Markdown 填充至 Content 字段。支持长文本自动分块。
 
-即使你半年不看，你的知识库也依然是鲜活的，而不是一堆 404 死链。
+### 2. 链接健康检查与自愈 (Self-Healing)
+定期巡检数据库中的 Source URL：
+- **存活检测**：自动识别 404/5xx 错误。
+- **智能修复**：发现失效链接时，自动通过 DuckDuckGo 搜索项目名称（针对 GitHub 仓库改名或迁移场景），尝试匹配新的有效地址。
+- **状态管理**：修复成功自动更新链接；无法修复则标记 Status 为 `Broken`。
 
-## 🧠 为什么做这个？
+### 3. 数据备份与灾备
+- **每日备份**：自动导出全量数据为 JSON 和 Markdown 格式至 `backups/` 目录。
+- **一键重建**：每次备份同时生成 `data_seed_latest.py` 脚本，可直接运行该脚本将数据重新写入新的 Notion 数据库，实现快速恢复。
 
-*   **Notion 就是我的数据库**：我不喜欢本地存一堆文件，Notion 是唯一的数据源。
-*   **机器人打工**：我只负责丢链接，剩下的抓取、检查、备份，全是机器人后台自己跑。
-*   **本地只是个备份**：Agent 每天会自动把 Notion 数据打包成 JSON/Markdown 文件。如果你用 Docker 部署，这些文件会自动保存到你服务器的 `backups/` 目录下（已配置挂载），确保云端数据在本地也有一份物理拷贝。
-
----
-
-## ✨ 它能干什么？
-
-### 1. 🔄 自动填内容
-你在 Notion 里新建一个页面，填上 URL (比如 GitHub 仓库地址)，然后... 就可以不管了。
-程序会每隔一段时间（默认 24 小时）扫一遍，发现没内容的，就自动把网页内容抓下来填进去。
-
-### 2. 🔗 链接挂了能自动修 (Self-Healing) 🔥
-这可能是最有用的功能。
-很多时候收藏的 GitHub 库改名了，或者作者删库了，链接就变 404。
-这个工具发现 404 后，**不会直接报错摆烂**，而是：
-1.  先重试几次。
-2.  如果不灵，它会去 DuckDuckGo **搜这个项目的名字**。
-3.  如果找到了新的有效地址（比如项目改名迁移了），它会**自动把 Notion 里的链接改过来**，并给你发个通知。
-4.  实在找不到，才会标记为 `Broken` 等你手动处理。
-
-### 3. 📦 每天自动备份 + 一键复活
-怕 Notion 挂了？或者账号出问题？
-它每天会自动把 Notion 里的所有数据拉下来，存成：
-*   JSON 文件（数据结构）
-*   Markdown 文件（方便人看）
-*   **`data_seed_latest.py` (最强功能)**：这是一个 Python 脚本。
-    *   **怎么用？** 假如你换了个 Notion 账号，或者新建了个数据库，直接运行这个脚本：`python data_seed_latest.py`
-    *   **结果**：它会把之前备份的所有数据，原封不动地“种”进新数据库里。
+### 4. 外部资源集成
+内置爬虫模块 (`discover_new_rules`)，支持从 cursor.directory 等源检索特定技术栈（如 Stripe, Automation）的最新规则并存入知识库。
 
 ---
 
-## �️ 怎么跑起来？
+## 快速开始
 
-### 1. 准备工作
-先复制一份配置文件：
+### 1. 环境配置
+
+复制配置文件：
 ```bash
 cp .env.example .env
 ```
-打开 `.env` 填几个参数：
-*   `NOTION_TOKEN`: Notion 的机器人 Token。
-*   `NOTION_DATABASE_ID`: 你的数据库 ID。
-*   (可选) Telegram 相关的，填了就能收到通知，不填也能跑。
 
-### 2. 启动 (推荐用 Docker)
-省事点，直接用 Docker 跑，环境都配好了：
+配置 `.env`:
+*   `NOTION_TOKEN`: Notion Integration Token
+*   `NOTION_DATABASE_ID`: 目标 Database ID
+*   `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`: (可选) 用于接收巡检报告和错误报警
 
+### 2. 运行
+
+**Docker Compose (推荐)**:
+已包含完整运行环境，支持自动重启。
 ```bash
 docker-compose up -d
 ```
-搞定。它会在后台一直运行，每天检查一次。
 
-### 3. 本地手动跑
-如果你想自己调试，或者手动触发一次备份：
-
+**本地运行**:
 ```bash
-# 装依赖
 pip install -r requirements.txt
-
-# 跑起来
 python agent_brain.py
 ```
 
 ---
 
-## 📂 文件是干嘛的？
+## 项目结构
 
-*   `agent_brain.py`: **大脑**。主程序，负责循环检查、修链接、发通知。
-*   `agent_notion.py`: **工具人**。负责跟 Notion 官方接口打交道，存数据、取数据。
-*   `backup_data.py`: **备份员**。专门负责把数据拉回本地存起来，顺便生成那个“复活脚本”。
-*   `data_seed_latest.py`: **复活药**。这就是自动生成的那个脚本，可以直接运行恢复数据。
+### 核心服务
+
+| 文件 | 说明 |
+|-----|------|
+| `agent_brain.py` | **主控程序**。负责任务调度、巡检循环、自愈逻辑决策及通知发送。 |
+| `agent_notion.py` | **Notion 交互层**。封装 Notion API，实现 MD5 内容去重、长文本分块和重试机制。 |
+| `backup_data.py` | **备份服务**。负责全量数据导出及 Seed 恢复脚本生成。 |
+
+### 辅助工具
+
+| 文件 | 说明 |
+|-----|------|
+| `sync_to_trae.py` | 将所有 Active 状态的 Skills 导出为单一文本文件，便于分发或 LLM 上下文使用。 |
+| `remove_duplicates.py` | 数据库清理工具。基于 Title 分组，保留内容最丰富且创建时间最早的记录。 |
+| `update_schema.py` | 数据库 Schema 校验与修复工具。确保 Status、Type 等字段类型符合系统要求。 |
+
+### 批量导入脚本
+
+| 文件 | 说明 |
+|-----|------|
+| `batch_import_skills.py` | 导入基础技能集（如 Python, Git 规范）。 |
+| `bulk_import_advanced_skills.py` | 导入高级技能集（涵盖 Web Scraping, MCP Servers）。 |
+| `core_assets_import.py` | 导入核心资产提示词（Prompts）。 |
+| `precision_import.py` | 导入带详细说明的精选技能。 |
 
 ---
 
-## 📝 常见问题
+## 逻辑架构
 
-**Q: 怎么加新技能？**
-A: 打开你的 Notion 数据库，点 New，填名字和 URL，选个 Tag (Skill/MCP)，完事。
+系统采用**纯同步**架构设计以确保稳定性，核心流程如下：
 
-**Q: 备份在哪？**
-A: 项目目录下的 `backups/` 文件夹里。
-
-**Q: 数据库被清空了怎么办？**
-A: 运行 `python data_seed_latest.py`，喝杯咖啡，数据就回来了。
-
----
+1.  **Iterate**: `agent_brain` 遍历 Notion 数据库页面。
+2.  **Fetch**: 请求 Source URL 获取最新内容（支持重试）。
+3.  **Healing**: 若遇到 404，触发 `search_for_alternative_url` 进行模糊搜索匹配。
+4.  **Dedup**: 计算远程内容 MD5，与 Notion 本地内容 MD5 对比。
+5.  **Upsert**: 仅在内容变更（MD5 不一致）或 URL 修复时调用 `agent_notion` 写入数据。
 
 ## License
+
 MIT

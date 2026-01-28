@@ -143,13 +143,16 @@ def main():
     print(f"准备入库核心资产：{len(items)} 条，使用去重逻辑，Status=Active")
     for idx, item in enumerate(items, 1):
         print(f"[{idx}/{len(items)}] Saving: {item['title']}")
-        agent.save_to_notion(
-            title=item["title"],
-            content=item["content"],
-            tag=item["tag"],
-            url=item["url"],
-            status="Active",
-        )
+        try:
+            agent.save_to_notion(
+                title=item["title"],
+                content=item["content"],
+                tag=item["tag"],
+                url=item["url"],
+                status="Active",
+            )
+        except Exception as e:
+            print(f"❌ Failed to save {item['title']}: {e}")
         time.sleep(0.5)
     print("核心资产入库流程结束")
 

@@ -160,13 +160,16 @@ def main():
     print("🚀 Starting Precision Import...")
     for task in tasks:
         print(f"\nProcessing: {task['title']}")
-        agent.save_to_notion(
-            title=task["title"],
-            content=task["content"],
-            tag=task["tag"],
-            url=task["url"],
-            status="Active"
-        )
+        try:
+            agent.save_to_notion(
+                title=task["title"],
+                content=task["content"],
+                tag=task["tag"],
+                url=task["url"],
+                status="Active"
+            )
+        except Exception as e:
+            print(f"❌ Error processing {task['title']}: {e}")
     print("\n✨ All tasks processed.")
 
 if __name__ == "__main__":
